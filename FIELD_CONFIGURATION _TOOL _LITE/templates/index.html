@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误截图分析系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(to bottom right, #e0e7ff, #f3e8ff);
+        }
+        .progress-bar {
+            height: 8px;
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background-color: #4f46e5;
+            transition: width 0.2s ease-in-out;
+        }
+        pre {
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            background-color: #f8f8f8;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #e5e7eb;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .result-card {
+            background-color: #fff;
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-4xl">
+        <h1 class="text-3xl font-bold text-center text-indigo-600 mb-6">错误截图分析系统</h1>
+        <a href="/config" class="text-indigo-600 hover:underline mb-4 block text-right">配置 DeepSeek API</a>
+        <form id="uploadForm" enctype="multipart/form-data" class="space-y-4">
+            <div class="flex items-center justify-center w-full">
+                <label class="flex flex-col items-center w-full p-6 bg-gray-50 border-2 border-dashed border-indigo-300 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                    <svg class="w-10 h-10 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V8m0 0L3 12m4-4l4 4m6 0a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    <span class="mt-2 text-sm text-gray-600">上传错误截图 (支持 PNG, JPG，最多10张，每张不超过16MB，建议分辨率≥300dpi)</span>
+                    <input type="file" name="image" accept="image/*" multiple class="hidden">
+                </label>
+            </div>
+            <div id="filePreview" class="text-sm text-gray-600 grid grid-cols-2 gap-2"></div>
+            <div class="progress-bar hidden" id="progressBar">
+                <div class="progress-bar-fill" id="progressBarFill" style="width: 0%"></div>
+            </div>
+            <button type="submit" id="uploadButton" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition font-semibold" disabled>分析错误</button>
+        </form>
+        <div id="result" class="mt-6 space-y-4 hidden">
+            <h2 class="text-xl font-semibold text-indigo-600">分析结果</h2>
+            <p id="apiStatus" class="text-sm text-gray-600"></p>
+            <button id="downloadOcrButton" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold hidden">下载所有 OCR 文字 (Markdown)</button>
+            <div id="resultContainer"></div>
+        </div>
+        <button onclick="generateReport()" class="mt-4 w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition font-semibold">生成周报</button>
+    </div>
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const uploadButton = document.getElementById('uploadButton');
+        const fileInput = uploadForm.querySelector('input[name="image"]');
+        const filePreview = document.getElementById('filePreview');
+        const resultDiv = document.getElementById('result');
+        const resultContainer = document.getElementById('resultContainer');
+        const downloadOcrButton = document.getElementById('downloadOcrButton');
+        const progressBar = document.getElementById('progressBar');
+        const progressBarFill = document.getElementById('progressBarFill');
+        const apiStatus = document.getElementById('apiStatus');
+        let lastResults = [];
+
+        // 文件选择时更新预览和按钮状态
+        fileInput.addEventListener('change', () => {
+            filePreview.innerHTML = '';
+            const files = fileInput.files;
+            if (files.length === 0) {
+                filePreview.innerHTML = '<p class="text-red-600">未选择任何图片</p>';
+                uploadButton.disabled = true;
+                return;
+            }
+            if (files.length > 10) {
+                filePreview.innerHTML = '<p class="text-red-600">最多上传10张图片</p>';
+                uploadButton.disabled = true;
+                return;
+            }
+            let valid = true;
+            Array.from(files).forEach(file => {
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                if (file.size > 16 * 1024 * 1024) {
+                    filePreview.innerHTML += `<p class="text-red-600">${file.name} 超过16MB</p>`;
+                    valid = false;
+                } else if (!file.name.match(/\.(png|jpg|jpeg)$/i)) {
+                    filePreview.innerHTML += `<p class="text-red-600">${file.name} 格式不支持</p>`;
+                    valid = false;
+                } else {
+                    filePreview.innerHTML += `
+                        <div class="flex items-center space-x-2">
+                            <img src="${URL.createObjectURL(file)}" class="w-16 h-16 object-cover rounded" alt="${file.name}">
+                            <p>${file.name} (${sizeMB} MB)</p>
+                        </div>
+                    `;
+                }
+            });
+            uploadButton.disabled = !valid;
+        });
+
+        uploadForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            uploadButton.disabled = true;
+            uploadButton.textContent = '正在分析...';
+            resultContainer.innerHTML = '<p class="text-gray-600">正在处理，请稍候...</p>';
+            progressBar.classList.remove('hidden');
+            progressBarFill.style.width = '0%';
+            resultDiv.classList.remove('hidden');
+            downloadOcrButton.classList.add('hidden');
+            apiStatus.textContent = '';
+
+            const files = fileInput.files;
+            const formData = new FormData();
+            Array.from(files).forEach(file => {
+                formData.append('image', file);
+                console.log(`添加文件: ${file.name}, 大小: ${file.size} 字节`);
+            });
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/upload', true);
+
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const percent = (event.loaded / event.total * 100).toFixed(0);
+                    progressBarFill.style.width = `${percent}%`;
+                    resultContainer.innerHTML = `<p class="text-gray-600">上传进度: ${percent}%</p>`;
+                }
+            };
+
+            xhr.onload = () => {
+                uploadButton.disabled = false;
+                uploadButton.textContent = '分析错误';
+                progressBar.classList.add('hidden');
+                if (xhr.status === 200) {
+                    const result = JSON.parse(xhr.responseText);
+                    if (result.error) {
+                        resultContainer.innerHTML = `<p class="text-red-600">${result.error}</p>`;
+                        return;
+                    }
+                    lastResults = result.results;
+                    apiStatus.textContent = `API 状态: ${result.api_status}`;
+                    resultContainer.innerHTML = '';
+                    result.results.forEach((item, index) => {
+                        resultContainer.innerHTML += `
+                            <div class="result-card">
+                                <h3 class="text-lg font-medium text-indigo-500 mb-2">图片 ${index + 1}: ${item.filename}</h3>
+                                <p class="font-semibold">错误内容:</p>
+                                <pre class="mt-1">${item.error_text || '发生错误'}</pre>
+                                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)" class="mt-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">复制错误内容</button>
+                                <p class="font-semibold mt-4">解决方案:</p>
+                                <pre class="mt-1">${item.solution || '未找到解决方案'}</pre>
+                                <button onclick="navigator.clipboard.writeText(this.previousElementSibling.textContent)" class="mt-1 bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">复制解决方案</button>
+                                ${item.image_path ? `<img src="${item.image_path}" class="mt-4 max-w-full rounded-lg shadow" alt="截图 ${index + 1}">` : ''}
+                            </div>
+                        `;
+                    });
+                    downloadOcrButton.classList.remove('hidden');
+                } else {
+                    resultContainer.innerHTML = `<p class="text-red-600">上传失败: HTTP ${xhr.status} - ${xhr.responseText}</p>`;
+                }
+            };
+
+            xhr.onerror = () => {
+                uploadButton.disabled = false;
+                uploadButton.textContent = '分析错误';
+                progressBar.classList.add('hidden');
+                resultContainer.innerHTML = `<p class="text-red-600">上传失败: 网络错误，请检查网络连接</p>`;
+            };
+
+            xhr.send(formData);
+        });
+
+        downloadOcrButton.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/download_ocr_text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ results: lastResults })
+                });
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = response.headers.get('Content-Disposition')?.split('filename=')[1] || 'ocr_texts.md';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    alert(`下载失败: ${error.error}`);
+                }
+            } catch (error) {
+                alert(`下载失败: ${error.message}`);
+            }
+        });
+
+        async function generateReport() {
+            try {
+                const response = await fetch('/generate_report');
+                const result = await response.json();
+                if (result.report_path) {
+                    alert('周报已生成: ' + result.report_path);
+                } else {
+                    alert('错误: ' + result.error);
+                }
+            } catch (error) {
+                alert('生成周报失败: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

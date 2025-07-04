@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置 DeepSeek API</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: linear-gradient(to bottom right, #e0e7ff, #f3e8ff);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+        <h1 class="text-2xl font-bold text-center text-indigo-600 mb-6">配置 DeepSeek API 密钥</h1>
+        <form id="configForm" class="space-y-4">
+            <div>
+                <label for="api_key" class="block text-sm font-medium text-gray-700">API 密钥</label>
+                <input type="text" id="api_key" name="api_key" value="{{ current_api_key if current_api_key else '' }}" class="mt-1 block w-full p-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <button type="submit" class="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition font-semibold">保存</button>
+        </form>
+        <a href="/" class="mt-4 block text-center text-indigo-600 hover:underline">返回主页</a>
+    </div>
+    <script>
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const response = await fetch('/config', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            alert(result.message || result.error);
+            if (result.message) {
+                window.location.href = '/';
+            }
+        });
+    </script>
+</body>
+</html>

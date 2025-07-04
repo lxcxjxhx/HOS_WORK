@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实习日常工作报告生成器</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">实习日常工作报告生成器</h1>
+            <button id="settings-btn" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">设置</button>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden">
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+                <h2 class="text-xl font-semibold mb-4">API 配置</h2>
+                <form id="config-form" class="space-y-4">
+                    <div>
+                        <label for="deepseek_api_key" class="block text-sm font-medium text-gray-700">DeepSeek API 密钥</label>
+                        <input type="text" id="deepseek_api_key" name="deepseek_api_key" value="{{ config.deepseek_api_key | default('') }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                    </div>
+                    <div>
+                        <label for="wecom_corpid" class="block text-sm font-medium text-gray-700">企业微信 CorpID</label>
+                        <input type="text" id="wecom_corpid" name="wecom_corpid" value="{{ config.wecom_corpid | default('') }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="wecom_app_secret" class="block text-sm font-medium text-gray-700">企业微信 App Secret</label>
+                        <input type="text" id="wecom_app_secret" name="wecom_app_secret" value="{{ config.wecom_app_secret | default('') }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="wecom_agent_id" class="block text-sm font-medium text-gray-700">企业微信 Agent ID</label>
+                        <input type="text" id="wecom_agent_id" name="wecom_agent_id" value="{{ config.wecom_agent_id | default('') }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="wecom_recipients" class="block text-sm font-medium text-gray-700">企业微信接收者 (用逗号分隔)</label>
+                        <input type="text" id="wecom_recipients" name="wecom_recipients" value="{{ config.wecom_recipients | default('') }}" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="user1,user2">
+                    </div>
+                    <div class="flex space-x-4">
+                        <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">保存配置</button>
+                        <button type="button" id="close-settings" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600">关闭</button>
+                    </div>
+                    <p id="config-status" class="text-sm text-gray-600"></p>
+                </form>
+            </div>
+        </div>
+
+        <!-- Report Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <form id="report-form" enctype="multipart/form-data" class="space-y-6">
+                <div>
+                    <label for="mode" class="block text-sm font-medium text-gray-700">模式选择</label>
+                    <select id="mode" name="mode" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <option value="simplified">简易模式</option>
+                        <option value="detailed">详细模式</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="intern_name" class="block text-sm font-medium text-gray-700">实习生姓名</label>
+                    <input type="text" id="intern_name" name="intern_name" value="钱佳宏" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                </div>
+                <div id="simplified-fields">
+                    <div>
+                        <label for="department" class="block text-sm font-medium text-gray-700">部门</label>
+                        <select id="department" name="department" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}" {% if dept == '绿盟上海分区产品服务部' %}selected{% endif %}>{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="mentor" class="block text-sm font-medium text-gray-700">指导老师</label>
+                        <select id="mentor" name="mentor" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                            {% for mentor in mentors %}
+                            <option value="{{ mentor }}" {% if mentor == '黎新雷' %}selected{% endif %}>{{ mentor }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="content" class="block text-sm font-medium text-gray-700">报告内容</label>
+                        <textarea id="content" name="content" rows="4" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required></textarea>
+                    </div>
+                </div>
+                <div id="detailed-fields" class="hidden space-y-4">
+                    <div>
+                        <label for="department_detailed" class="block text-sm font-medium text-gray-700">部门</label>
+                        <input type="text" id="department_detailed" name="department" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                    </div>
+                    <div>
+                        <label for="mentor_detailed" class="block text-sm font-medium text-gray-700">指导老师</label>
+                        <input type="text" id="mentor_detailed" name="mentor" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                    </div>
+                    <div>
+                        <label for="work_content" class="block text-sm font-medium text-gray-700">今日工作内容</label>
+                        <textarea id="work_content" name="work_content" rows="4" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required></textarea>
+                    </div>
+                    <div>
+                        <label for="achievements_reflections" class="block text-sm font-medium text-gray-700">收获与体会</label>
+                        <textarea id="achievements_reflections" name="achievements_reflections" rows="4" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required></textarea>
+                    </div>
+                    <div>
+                        <label for="issues_improvements" class="block text-sm font-medium text-gray-700">存在问题与改进计划</label>
+                        <div id="issues_improvements_container">
+                            <input type="text" name="issues_improvements" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <button type="button" id="add_issue" class="mt-2 bg-green-500 text-white px-2 py-1 rounded-md hover:bg-green-600">添加问题</button>
+                    </div>
+                    <div>
+                        <label for="next_day_plan" class="block text-sm font-medium text-gray-700">明日计划</label>
+                        <div id="next_day_plan_container">
+                            <input type="text" name="next_day_plan" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        </div>
+                        <button type="button" id="add_plan" class="mt-2 bg-green-500 text-white px-2 py-1 rounded-md hover:bg-green-600">添加计划</button>
+                    </div>
+                </div>
+                <div>
+                    <label for="image" class="block text-sm font-medium text-gray-700">上传图片（可多选）</label>
+                    <input type="file" id="image" name="image" accept="image/*" multiple class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                </div>
+                <div>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">提交并下载报告</button>
+                </div>
+                <p id="submit-status" class="text-sm text-gray-600"></p>
+            </form>
+
+            <!-- Progress Bar -->
+            <div id="progress-container" class="mt-4 hidden">
+                <h3 class="text-lg font-semibold mb-2">处理进度</h3>
+                <div class="w-full bg-gray-200 rounded-full h-4">
+                    <div id="progress-bar" class="bg-indigo-600 h-4 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="progress-status" class="text-sm text-gray-600 mt-2">等待处理...</p>
+            </div>
+        </div>
+
+        <!-- Weekly Report Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">生成周报</h2>
+            <form id="weekly-report-form" class="space-y-6">
+                <div>
+                    <label for="week_start" class="block text-sm font-medium text-gray-700">选择周起始日期</label>
+                    <input type="date" id="week_start" name="week_start" value="2025-07-03" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <label for="weekly_intern_name" class="block text-sm font-medium text-gray-700">实习生姓名</label>
+                    <input type="text" id="weekly_intern_name" name="intern_name" value="钱佳宏" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
+                </div>
+                <div>
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700">生成并下载周报</button>
+                    <button type="button" id="export-csv" class="ml-4 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">导出CSV</button>
+                </div>
+                <p id="weekly-status" class="text-sm text-gray-600"></p>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('mode').addEventListener('change', function() {
+            const mode = this.value;
+            document.getElementById('simplified-fields').classList.toggle('hidden', mode !== 'simplified');
+            document.getElementById('detailed-fields').classList.toggle('hidden', mode !== 'detailed');
+            updateRequiredFields();
+        });
+
+        function updateRequiredFields() {
+            const mode = document.getElementById('mode').value;
+            document.getElementById('content').required = mode === 'simplified';
+            document.getElementById('work_content').required = mode === 'detailed';
+            document.getElementById('achievements_reflections').required = mode === 'detailed';
+            document.getElementById('department').required = mode === 'simplified';
+            document.getElementById('mentor').required = mode === 'simplified';
+            document.getElementById('department_detailed').required = mode === 'detailed';
+            document.getElementById('mentor_detailed').required = mode === 'detailed';
+        }
+
+        document.getElementById('add_issue').addEventListener('click', function() {
+            const container = document.getElementById('issues_improvements_container');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'issues_improvements';
+            input.className = 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm';
+            container.appendChild(input);
+        });
+
+        document.getElementById('add_plan').addEventListener('click', function() {
+            const container = document.getElementById('next_day_plan_container');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.name = 'next_day_plan';
+            input.className = 'mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm';
+            container.appendChild(input);
+        });
+
+        document.getElementById('settings-btn').addEventListener('click', function() {
+            document.getElementById('settings-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('close-settings').addEventListener('click', function() {
+            document.getElementById('settings-modal').classList.add('hidden');
+        });
+
+        document.getElementById('config-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/save_config', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('config-status').textContent = data.message;
+                if (data.status === 'success') {
+                    document.getElementById('config-status').className = 'text-sm text-green-600';
+                    setTimeout(() => {
+                        document.getElementById('settings-modal').classList.add('hidden');
+                        location.reload();
+                    }, 1000);
+                } else {
+                    document.getElementById('config-status').className = 'text-sm text-red-600';
+                }
+            })
+            .catch(error => {
+                document.getElementById('config-status').textContent = '配置失败: ' + error;
+                document.getElementById('config-status').className = 'text-sm text-red-600';
+            });
+        });
+
+        document.getElementById('report-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressStatus = document.getElementById('progress-status');
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressStatus.textContent = '等待处理...';
+            document.getElementById('submit-status').textContent = '';
+
+            fetch('/submit', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.message); });
+                }
+                const requestId = response.headers.get('X-Request-ID');
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'report.docx';
+                if (contentDisposition && contentDisposition.includes('filename*=UTF-8')) {
+                    const utf8Filename = contentDisposition.split("filename*=UTF-8''")[1];
+                    filename = decodeURIComponent(utf8Filename);
+                } else if (contentDisposition && contentDisposition.includes('filename=')) {
+                    filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+                }
+                // Start polling progress
+                if (requestId) {
+                    pollProgress(requestId);
+                }
+                return response.blob().then(blob => ({ blob, filename }));
+            })
+            .then(({ blob, filename }) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                document.getElementById('submit-status').textContent = '报告生成并发送成功！';
+                document.getElementById('submit-status').className = 'text-sm text-green-600';
+                progressContainer.classList.add('hidden');
+            })
+            .catch(error => {
+                document.getElementById('submit-status').textContent = '提交失败: ' + error.message;
+                document.getElementById('submit-status').className = 'text-sm text-red-600';
+                progressContainer.classList.add('hidden');
+            });
+        });
+
+        function pollProgress(requestId) {
+            const progressBar = document.getElementById('progress-bar');
+            const progressStatus = document.getElementById('progress-status');
+            const interval = setInterval(() => {
+                fetch(`/progress/${requestId}`)
+                .then(response => response.json())
+                .then(data => {
+                    progressBar.style.width = `${data.progress}%`;
+                    progressStatus.textContent = data.status;
+                    if (data.progress >= 100 || data.status === 'error') {
+                        clearInterval(interval);
+                        if (data.status === 'error') {
+                            document.getElementById('submit-status').textContent = '提交失败: ' + data.message;
+                            document.getElementById('submit-status').className = 'text-sm text-red-600';
+                            document.getElementById('progress-container').classList.add('hidden');
+                        }
+                    }
+                })
+                .catch(error => {
+                    clearInterval(interval);
+                    document.getElementById('submit-status').textContent = '进度获取失败: ' + error;
+                    document.getElementById('submit-status').className = 'text-sm text-red-600';
+                    document.getElementById('progress-container').classList.add('hidden');
+                });
+            }, 1000);
+        }
+
+        document.getElementById('weekly-report-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            fetch('/weekly_report', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.message); });
+                }
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = 'weekly_report.docx';
+                if (contentDisposition && contentDisposition.includes('filename*=UTF-8')) {
+                    const utf8Filename = contentDisposition.split("filename*=UTF-8''")[1];
+                    filename = decodeURIComponent(utf8Filename);
+                } else if (contentDisposition && contentDisposition.includes('filename=')) {
+                    filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+                }
+                return response.blob().then(blob => ({ blob, filename }));
+            })
+            .then(({ blob, filename }) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                document.getElementById('weekly-status').textContent = '周报生成并发送成功！';
+                document.getElementById('weekly-status').className = 'text-sm text-green-600';
+            })
+            .catch(error => {
+                document.getElementById('weekly-status').textContent = '周报生成失败: ' + error.message;
+                document.getElementById('weekly-status').className = 'text-sm text-red-600';
+            });
+        });
+
+        document.getElementById('export-csv').addEventListener('click', function() {
+            fetch('/export', {
+                method: 'GET'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.message); });
+                }
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = `reports_${new Date().toISOString().replace(/T/, '_').replace(/:|\./g, '-')}.csv`;
+                if (contentDisposition && contentDisposition.includes('filename*=UTF-8')) {
+                    const utf8Filename = contentDisposition.split("filename*=UTF-8''")[1];
+                    filename = decodeURIComponent(utf8Filename);
+                } else if (contentDisposition && contentDisposition.includes('filename=')) {
+                    filename = contentDisposition.split('filename=')[1].replace(/"/g, '');
+                }
+                return response.blob().then(blob => ({ blob, filename }));
+            })
+            .then(({ blob, filename }) => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url);
+                document.getElementById('weekly-status').textContent = 'CSV导出成功！';
+                document.getElementById('weekly-status').className = 'text-sm text-green-600';
+            })
+            .catch(error => {
+                document.getElementById('weekly-status').textContent = 'CSV导出失败: ' + error.message;
+                document.getElementById('weekly-status').className = 'text-sm text-red-600';
+            });
+        });
+
+        updateRequiredFields();
+    </script>
+</body>
+</html>

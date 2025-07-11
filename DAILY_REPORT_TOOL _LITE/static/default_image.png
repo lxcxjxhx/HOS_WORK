@@ -1,3 +1,0 @@
-# Note: This is a placeholder for default_image.png. The app.py script generates a 200x200 pixel PNG with text "默认图片".
-# If you have a specific default image, place it in ./static/default_image.png.
-# The programmatically generated image is created if it doesn't exist.

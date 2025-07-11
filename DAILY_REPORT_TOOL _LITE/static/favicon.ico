@@ -1,7 +1,0 @@
-# Note: This is a placeholder for favicon.ico. In a real implementation, you would provide a binary .ico file.
-# For simplicity, create a 16x16 pixel favicon using PIL in Python or use an existing .ico file.
-# To generate programmatically:
-from PIL import Image
-img = Image.new('RGB', (16, 16), color='blue')
-img.save('./static/favicon.ico', format='ICO')
-# Place the actual favicon.ico in ./static/favicon.ico

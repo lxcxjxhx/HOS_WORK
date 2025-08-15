@@ -1,0 +1,7 @@
+# 项目依赖包列表
+pyautogui==0.9.53
+pynput==1.7.6
+pytest==7.3.1
+pyinstaller==5.13.0
+pystray==0.19.4
+pillow==9.5.0

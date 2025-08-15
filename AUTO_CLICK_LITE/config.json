@@ -1,0 +1,48 @@
+{
+    "default_settings": {
+        "interval": 100,
+        "min_interval": 80,
+        "max_interval": 120,
+        "count": -1,
+        "button": "left",
+        "click_type": "single",
+        "position_type": "current",
+        "fixed_position": {
+            "x": 0,
+            "y": 0
+        },
+        "hotkeys": {
+            "start": "f6",
+            "stop": "f7",
+            "pause": "f8"
+        },
+        "randomize": true,
+        "sound_effects": false,
+        "dark_mode": false,
+        "multi_position": true,
+        "positions": [
+            {
+                "x": 2502,
+                "y": 1452,
+                "note": "位置2",
+                "enabled": true,
+                "text": "继续",
+                "text_interval": 1000
+            },
+            {
+                "x": 2013,
+                "y": 1339,
+                "note": "位置2",
+                "enabled": true,
+                "text": "继续",
+                "text_interval": 1000
+            }
+        ]
+    },
+    "app_settings": {
+        "language": "zh",
+        "check_for_updates": true,
+        "logging_enabled": false,
+        "log_level": "INFO"
+    }
+}
